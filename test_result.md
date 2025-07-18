@@ -228,7 +228,7 @@ backend:
 frontend:
   - task: "Homepage with API integration"
     implemented: true
-    working: "NA"
+    working: true
     file: "pages/Home.js"
     stuck_count: 0
     priority: "high"
@@ -237,10 +237,13 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Complete homepage with real API calls replacing mock data, dynamic stats, testimonials, and functional PDF download"
+        - working: true
+          agent: "testing"
+          comment: "✅ TESTED: Homepage loads successfully with API integration. Statistics display correctly (15,000+ students, 85% success rate, 30 days avg time). 9 chapters displayed from ebook content API. PDF download functionality working with loading states and proper API calls."
 
   - task: "Preview page with API integration"
     implemented: true
-    working: "NA"
+    working: true
     file: "pages/Preview.js"
     stuck_count: 0
     priority: "high"
@@ -249,10 +252,13 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Ebook preview page with chapter navigation, content loaded from API, and PDF download integration"
+        - working: true
+          agent: "testing"
+          comment: "✅ TESTED: Preview page navigation working. Table of contents displays 10 chapters from API. Chapter content loads correctly with proper formatting. PDF download from preview page functional. Minor: Chapter navigation buttons need selector adjustment but core functionality works."
 
   - task: "PDF download functionality"
     implemented: true
-    working: "NA"
+    working: true
     file: "pages/Home.js, pages/Preview.js"
     stuck_count: 0
     priority: "high"
@@ -261,6 +267,9 @@ frontend:
         - working: "NA"
           agent: "main"
           comment: "Frontend PDF download with loading states, error handling, and automatic file download"
+        - working: true
+          agent: "testing"
+          comment: "✅ TESTED: PDF download functionality working on both homepage and preview page. Loading states display correctly ('Génération en cours...'). API calls to /api/generate-pdf successful. Download process completes successfully with proper user feedback."
 
 metadata:
   created_by: "main_agent"
