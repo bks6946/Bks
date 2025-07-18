@@ -1,24 +1,61 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { ArrowLeft, Download, BookOpen, ChevronRight, ChevronLeft } from "lucide-react";
-import { mockEbook } from "../data/mock";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const Preview = () => {
   const [currentChapter, setCurrentChapter] = useState(0);
+  const [ebookContent, setEbookContent] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = 'comment-faire-1000-euros-en-1-mois.pdf';
-    link.click();
-    alert('Téléchargement commencé ! (Fonctionnalité mock)');
+  useEffect(() => {
+    const fetchEbookContent = async () => {
+      try {
+        const response = await axios.get(`${API}/ebook/content`);
+        setEbookContent(response.data.data);
+      } catch (error) {
+        console.error('Error fetching ebook content:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEbookContent();
+  }, []);
+
+  const handleDownload = async () => {
+    if (isGenerating) return;
+    
+    setIsGenerating(true);
+    
+    try {
+      const response = await axios.post(`${API}/generate-pdf`);
+      
+      if (response.data.success) {
+        // Create download link
+        const downloadUrl = `${BACKEND_URL}${response.data.download_url}`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = response.data.filename;
+        link.click();
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erreur lors de la génération du PDF. Veuillez réessayer.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const nextChapter = () => {
-    if (currentChapter < mockEbook.chapters.length - 1) {
+    if (ebookContent && currentChapter < ebookContent.chapters.length - 1) {
       setCurrentChapter(currentChapter + 1);
     }
   };
@@ -29,7 +66,28 @@ const Preview = () => {
     }
   };
 
-  const currentChapterData = mockEbook.chapters[currentChapter];
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ebookContent) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Erreur lors du chargement du contenu</p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentChapterData = ebookContent.chapters[currentChapter];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -47,9 +105,22 @@ const Preview = () => {
                 <h1 className="text-2xl font-bold text-gray-900">Aperçu de l'Ebook</h1>
               </div>
             </div>
-            <Button onClick={handleDownload} className="bg-indigo-600 hover:bg-indigo-700">
-              <Download className="mr-2 h-4 w-4" />
-              Télécharger PDF
+            <Button 
+              onClick={handleDownload} 
+              disabled={isGenerating}
+              className="bg-indigo-600 hover:bg-indigo-700"
+            >
+              {isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Génération...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Télécharger PDF
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -66,7 +137,7 @@ const Preview = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {mockEbook.chapters.map((chapter, index) => (
+                    {ebookContent.chapters.map((chapter, index) => (
                       <button
                         key={index}
                         onClick={() => setCurrentChapter(index)}
@@ -93,7 +164,7 @@ const Preview = () => {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <Badge variant="outline" className="mb-2">
-                      Chapitre {currentChapter + 1} sur {mockEbook.chapters.length}
+                      Chapitre {currentChapter + 1} sur {ebookContent.chapters.length}
                     </Badge>
                     <div className="flex space-x-2">
                       <Button
@@ -108,7 +179,7 @@ const Preview = () => {
                         variant="outline"
                         size="sm"
                         onClick={nextChapter}
-                        disabled={currentChapter === mockEbook.chapters.length - 1}
+                        disabled={currentChapter === ebookContent.chapters.length - 1}
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
@@ -166,13 +237,13 @@ const Preview = () => {
                 </Button>
                 
                 <div className="text-sm text-gray-500">
-                  {currentChapter + 1} / {mockEbook.chapters.length}
+                  {currentChapter + 1} / {ebookContent.chapters.length}
                 </div>
                 
                 <Button
                   variant="outline"
                   onClick={nextChapter}
-                  disabled={currentChapter === mockEbook.chapters.length - 1}
+                  disabled={currentChapter === ebookContent.chapters.length - 1}
                   className="flex items-center space-x-2"
                 >
                   <span>Chapitre Suivant</span>
@@ -196,10 +267,20 @@ const Preview = () => {
           <Button 
             size="lg" 
             onClick={handleDownload}
+            disabled={isGenerating}
             className="bg-white text-indigo-600 hover:bg-gray-50 px-8 py-3"
           >
-            <Download className="mr-2 h-5 w-5" />
-            Télécharger l'Ebook Complet
+            {isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600 mr-2"></div>
+                Génération...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-5 w-5" />
+                Télécharger l'Ebook Complet
+              </>
+            )}
           </Button>
         </div>
       </section>

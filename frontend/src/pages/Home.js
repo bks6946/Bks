@@ -1,20 +1,77 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Download, BookOpen, TrendingUp, Users, Clock, Star } from "lucide-react";
-import { mockEbook } from "../data/mock";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const API = `${BACKEND_URL}/api`;
 
 const Home = () => {
-  const handleDownload = () => {
-    // Mock download functionality
-    const link = document.createElement('a');
-    link.href = '#';
-    link.download = 'comment-faire-1000-euros-en-1-mois.pdf';
-    link.click();
-    alert('Téléchargement commencé ! (Fonctionnalité mock)');
+  const [ebookContent, setEbookContent] = useState(null);
+  const [stats, setStats] = useState(null);
+  const [testimonials, setTestimonials] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [ebookResponse, statsResponse, testimonialsResponse] = await Promise.all([
+          axios.get(`${API}/ebook/content`),
+          axios.get(`${API}/stats`),
+          axios.get(`${API}/testimonials`)
+        ]);
+
+        setEbookContent(ebookResponse.data.data);
+        setStats(statsResponse.data);
+        setTestimonials(testimonialsResponse.data.data);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleDownload = async () => {
+    if (isGenerating) return;
+    
+    setIsGenerating(true);
+    
+    try {
+      const response = await axios.post(`${API}/generate-pdf`);
+      
+      if (response.data.success) {
+        // Create download link
+        const downloadUrl = `${BACKEND_URL}${response.data.download_url}`;
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = response.data.filename;
+        link.click();
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Erreur lors de la génération du PDF. Veuillez réessayer.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -58,10 +115,20 @@ const Home = () => {
             <Button 
               size="lg" 
               onClick={handleDownload}
+              disabled={isGenerating}
               className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 text-lg"
             >
-              <Download className="mr-2 h-5 w-5" />
-              Télécharger l'Ebook PDF
+              {isGenerating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Génération en cours...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-5 w-5" />
+                  Télécharger l'Ebook PDF
+                </>
+              )}
             </Button>
             <Button 
               size="lg" 
@@ -77,29 +144,31 @@ const Home = () => {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <Users className="h-12 w-12 text-indigo-600 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-gray-900">15k+</div>
-                <div className="text-gray-600">Étudiants aidés</div>
-              </CardContent>
-            </Card>
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <TrendingUp className="h-12 w-12 text-green-600 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-gray-900">85%</div>
-                <div className="text-gray-600">Taux de réussite</div>
-              </CardContent>
-            </Card>
-            <Card className="text-center">
-              <CardContent className="pt-6">
-                <Clock className="h-12 w-12 text-orange-600 mx-auto mb-2" />
-                <div className="text-3xl font-bold text-gray-900">30 jours</div>
-                <div className="text-gray-600">Pour voir des résultats</div>
-              </CardContent>
-            </Card>
-          </div>
+          {stats && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+              <Card className="text-center">
+                <CardContent className="pt-6">
+                  <Users className="h-12 w-12 text-indigo-600 mx-auto mb-2" />
+                  <div className="text-3xl font-bold text-gray-900">{stats.students_helped.toLocaleString()}+</div>
+                  <div className="text-gray-600">Étudiants aidés</div>
+                </CardContent>
+              </Card>
+              <Card className="text-center">
+                <CardContent className="pt-6">
+                  <TrendingUp className="h-12 w-12 text-green-600 mx-auto mb-2" />
+                  <div className="text-3xl font-bold text-gray-900">{stats.success_rate}%</div>
+                  <div className="text-gray-600">Taux de réussite</div>
+                </CardContent>
+              </Card>
+              <Card className="text-center">
+                <CardContent className="pt-6">
+                  <Clock className="h-12 w-12 text-orange-600 mx-auto mb-2" />
+                  <div className="text-3xl font-bold text-gray-900">{stats.avg_time_to_results} jours</div>
+                  <div className="text-gray-600">Pour voir des résultats</div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </div>
       </section>
 
@@ -111,25 +180,27 @@ const Home = () => {
               Ce que vous allez apprendre
             </h3>
             
-            <div className="grid md:grid-cols-2 gap-8">
-              {mockEbook.chapters.slice(0, 6).map((chapter, index) => (
-                <Card key={index} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                        <span className="text-indigo-600 font-bold">{index + 1}</span>
+            {ebookContent && (
+              <div className="grid md:grid-cols-2 gap-8">
+                {ebookContent.chapters.slice(0, 6).map((chapter, index) => (
+                  <Card key={index} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                          <span className="text-indigo-600 font-bold">{index + 1}</span>
+                        </div>
+                        <CardTitle className="text-lg">{chapter.title}</CardTitle>
                       </div>
-                      <CardTitle className="text-lg">{chapter.title}</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription className="text-gray-600">
-                      {chapter.description}
-                    </CardDescription>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardHeader>
+                    <CardContent>
+                      <CardDescription className="text-gray-600">
+                        {chapter.description}
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -142,26 +213,7 @@ const Home = () => {
           </h3>
           
           <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {[
-              {
-                name: "Marie L.",
-                role: "Étudiante en Commerce",
-                content: "J'ai réussi à gagner 1200€ en suivant les conseils sur le freelancing. Parfait pour financer mes études !",
-                rating: 5
-              },
-              {
-                name: "Thomas R.",
-                role: "Étudiant en Informatique",
-                content: "Les stratégies de vente en ligne m'ont permis de créer un complément de revenus stable. Très pratique !",
-                rating: 5
-              },
-              {
-                name: "Sarah M.",
-                role: "Étudiante en Droit",
-                content: "Guide très complet avec des méthodes réalistes. J'ai pu économiser pour mon voyage d'études.",
-                rating: 5
-              }
-            ].map((testimonial, index) => (
+            {testimonials.map((testimonial, index) => (
               <Card key={index} className="hover:shadow-lg transition-shadow">
                 <CardContent className="pt-6">
                   <div className="flex mb-4">
@@ -193,10 +245,20 @@ const Home = () => {
           <Button 
             size="lg" 
             onClick={handleDownload}
+            disabled={isGenerating}
             className="bg-white text-indigo-600 hover:bg-gray-50 px-8 py-4 text-lg"
           >
-            <Download className="mr-2 h-5 w-5" />
-            Télécharger Maintenant - Gratuit
+            {isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600 mr-2"></div>
+                Génération...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-5 w-5" />
+                Télécharger Maintenant - Gratuit
+              </>
+            )}
           </Button>
         </div>
       </section>
